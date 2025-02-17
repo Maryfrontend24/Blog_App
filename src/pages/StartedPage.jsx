@@ -23,7 +23,7 @@ const StartedPage = () => {
       </ul>
       <img
         className="banner"
-        src="/src/assets/blog1.jpg"
+        src="/src/assets/blog1.webp"
         alt="banner"
         loading="lazy"
       ></img>
