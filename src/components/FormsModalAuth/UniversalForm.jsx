@@ -55,6 +55,14 @@ const UniversalForm = ({ formType }) => {
           message: "Something went wrong!",
         });
       }
+
+      if (error?.response?.status === 500) {
+        setError("general", {
+          type: "server",
+          message: "Internal Server Error. Please try again later.",
+        });
+        navigate("/");
+      }
     }
   };
 
@@ -68,6 +76,7 @@ const UniversalForm = ({ formType }) => {
             : "Edit Profile"}
       </h2>
 
+      {/* Форма для входа */}
       {formType === "signIn" && (
         <>
           <div className="form-group">
@@ -98,6 +107,7 @@ const UniversalForm = ({ formType }) => {
         </>
       )}
 
+      {/* Форма для регистрации */}
       {formType === "createAccount" && (
         <>
           <div className="form-group">
@@ -183,6 +193,7 @@ const UniversalForm = ({ formType }) => {
         </>
       )}
 
+      {/* Форма для редактирования профиля */}
       {formType === "editProfile" && (
         <>
           <div className="form-group">
@@ -218,11 +229,11 @@ const UniversalForm = ({ formType }) => {
               {...register("newPassword", {
                 minLength: {
                   value: 6,
-                  message: "Password must contains from 6 to 40 characters",
+                  message: "Password must contain 6-40 characters",
                 },
                 maxLength: {
                   value: 40,
-                  message: "Password must contains from 6 to 40 characters",
+                  message: "Password must contain 6-40 characters",
                 },
               })}
             />

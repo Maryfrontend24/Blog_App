@@ -7,7 +7,6 @@ import { Spin } from "antd";
 
 const SignUpPage = () => {
   const { registerUser, errorUser, state } = useUsers();
-  const { userStatusRequest } = state;
   const navigate = useNavigate();
 
   const handleFormSubmit = async (username, email, password) => {
@@ -34,12 +33,6 @@ const SignUpPage = () => {
         formType="createAccount"
         handleFormSubmit={handleFormSubmit}
       />
-
-      {userStatusRequest === "pending" && (
-        <div className="loading-spinner">
-          <Spin size="middle" />
-        </div>
-      )}
     </div>
   );
 };

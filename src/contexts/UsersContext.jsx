@@ -16,6 +16,7 @@ const initialState = {
   userIsEdit: false,
   userStatusRequest: null,
   token: localStorage.getItem("token"),
+  serverErrors: null,
 };
 
 console.log("Initial token:", localStorage.getItem("token"));
@@ -37,12 +38,14 @@ const userReducer = (state, action) => {
         image: action.payload.image || defImage,
         userIsEdit: true,
         userStatusRequest: "fulfilled",
+        serverErrors: null,
       };
     case "ERROR":
       return {
         ...state,
         errorUser: action.payload,
         userStatusRequest: "rejected",
+        serverError: action.payload === "500" ? "500" : null,
       };
     case "CLEAR_ERROR":
       return { ...state, errorUser: null };
@@ -56,6 +59,7 @@ const userReducer = (state, action) => {
         userIsEdit: false,
         token: null,
         userStatusRequest: "fulfilled",
+        serverErrors: null,
       };
     default:
       return state;
@@ -95,17 +99,40 @@ export const UsersProvider = ({ children }) => {
       navigate("/signin"); // Перенаправляем на страницу входа
     } catch (error) {
       console.error("Error during registration:", error);
-      dispatch({
-        type: "ERROR",
-        payload: error.response ? error.response.data : "Network error",
-      });
+
+      const errorMessage =
+        error.response && error.response.data.errors
+          ? error.response.data.errors.body[0]
+          : error.response
+            ? `Error ${error.response.status}: ${error.response.statusText}`
+            : error.message || "Network error";
+
+      if (error.response && error.response.status === 500) {
+        dispatch({
+          type: "ERROR",
+          payload: "500",
+        });
+      } else {
+        dispatch({
+          type: "ERROR",
+          payload: errorMessage,
+        });
+      }
     } finally {
-      dispatch({ type: "STOP_LOADING" }); // Выключаем состояние загрузки
+      dispatch({ type: "STOP_LOADING" });
     }
   };
 
   const fetchLoginUser = async (email, password) => {
-    dispatch({ type: "SET_LOADING" });
+    dispatch({ type: "SET_LOADING" }); // Запускаем спиннер
+
+    const timeout = setTimeout(() => {
+      dispatch({
+        type: "ERROR",
+        payload: "Request timeout. Please try again.",
+      });
+      dispatch({ type: "STOP_LOADING" });
+    }, 10000);
 
     try {
       const response = await axios.post(
@@ -127,6 +154,8 @@ export const UsersProvider = ({ children }) => {
         throw new Error("Token not received or invalid");
       }
 
+      clearTimeout(timeout);
+
       localStorage.setItem(
         "user",
         JSON.stringify({
@@ -138,8 +167,7 @@ export const UsersProvider = ({ children }) => {
         }),
       );
 
-      localStorage.setItem("token", user.token); // Сохраняем токен отдельно
-
+      localStorage.setItem("token", user.token);
       axios.defaults.headers.common["Authorization"] = `Token ${user.token}`;
 
       dispatch({
@@ -158,12 +186,30 @@ export const UsersProvider = ({ children }) => {
       const errorMessage =
         error.response && error.response.data.errors
           ? error.response.data.errors.body[0]
-          : error.message || "Network error";
+          : error.response
+            ? `Error ${error.response.status}: ${error.response.statusText}`
+            : error.message || "Network error";
 
-      dispatch({
-        type: "ERROR",
-        payload: errorMessage,
-      });
+      clearTimeout(timeout);
+
+      if (error.response && error.response.status === 500) {
+        // Показываем сообщение пользователю перед перенаправлением
+        dispatch({
+          type: "ERROR",
+          payload: "Internal Server Error. Please try again later.",
+        });
+        alert("Произошла ошибка на сервере. Перенаправляем на главную.");
+
+        // Добавляем задержку перед редиректом
+        setTimeout(() => {
+          navigate("/");
+        }, 3000);
+      } else {
+        dispatch({
+          type: "ERROR",
+          payload: errorMessage,
+        });
+      }
     } finally {
       dispatch({ type: "STOP_LOADING" });
     }
@@ -201,7 +247,7 @@ export const UsersProvider = ({ children }) => {
           username: updatedUser.username,
           email: updatedUser.email,
           bio: updatedUser.bio,
-          image: updatedUser.image, // Обновленное изображение
+          image: updatedUser.image,
           token,
         }),
       );
@@ -230,7 +276,7 @@ export const UsersProvider = ({ children }) => {
     }
   };
 
-  // для выхода пользователя
+  // выход
   const logoutUser = () => {
     console.log("Logging out...");
 

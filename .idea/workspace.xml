@@ -6,8 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="41d83e05-b9f7-4290-a463-0fb619815c8b" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/pages/ErrorFoundPage.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/FormsArticle/FormArticle.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/FormsArticle/FormArticle.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/FormsModalAuth/UniversalForm.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/FormsModalAuth/UniversalForm.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/contexts/UsersContext.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/contexts/UsersContext.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/pages/SignInPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/pages/SignInPage.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,7 +57,7 @@
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
-  <component name="RunManager" selected="npm.dev">
+  <component name="RunManager" selected="npm.prettier:fix">
     <configuration name="dev" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
       <package-json value="$PROJECT_DIR$/package.json" />
       <command value="run" />
@@ -88,8 +90,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="npm.dev" />
         <item itemvalue="npm.prettier:fix" />
+        <item itemvalue="npm.dev" />
         <item itemvalue="npm.lint:fix" />
       </list>
     </recent_temporary>
@@ -111,7 +113,7 @@
       <updated>1739794102274</updated>
       <workItem from="1739794105146" duration="794000" />
       <workItem from="1739794978354" duration="6691000" />
-      <workItem from="1739803495043" duration="1606000" />
+      <workItem from="1739803495043" duration="7324000" />
     </task>
     <servers />
   </component>
