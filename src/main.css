@@ -710,12 +710,10 @@ body img.banner {
   width: 100% !important;
 }
 
-
 .ant-result-extra {
-  display:inline-flex;
+  display: inline-flex;
   width: 275px !important;
 }
-
 
 .ant-result {
   display: flex;
@@ -724,21 +722,19 @@ body img.banner {
   align-items: center;
   text-align: center;
   margin: 0; /* Убираем отступы */
+  -webkit-display: -webkit-flex;
+  -webkit-flex-direction: column;
+  -webkit-align-items: center;
+  -webkit-justify-content: center;
 }
 
 .ant-result .ant-btn {
   display: flex;
-  justify-content:center;
+  justify-content: center;
   align-items: start;
   width: 275px; /* Задайте фиксированную ширину, если нужно */
 }
 
-  .ant-result {
-    -webkit-display: -webkit-flex;
-    -webkit-flex-direction: column;
-    -webkit-align-items: center;
-    -webkit-justify-content: center;
-  }
 .ant-result .ant-btn {
   -webkit-align-items: center;
   -webkit-justify-content: center;
