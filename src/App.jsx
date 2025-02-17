@@ -13,9 +13,7 @@ import { UsersProvider } from "./contexts/UsersContext.jsx";
 import { CreateArticlePage } from "./pages/CreateArticlePage.jsx";
 import { EditArticlePage } from "./pages/EditArticlePage.jsx";
 import { EditAuthorProfile } from "./pages/EditAuthorProfile.jsx";
-import {NotFoundError} from "./components/NotFoundError/NotFoundError.jsx";
-
-
+import { NotFoundError } from "./components/NotFoundError/NotFoundError.jsx";
 
 function App() {
   return (

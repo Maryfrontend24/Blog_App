@@ -1,6 +1,7 @@
 import blog4 from "/src/assets/blog4.webp";
 import blog5 from "/src/assets/blog5.webp";
 import blog3 from "/src/assets/blog3.webp";
+import blog1 from "/src/assets/blog1.webp";
 
 const StartedPage = () => {
   return (
@@ -21,12 +22,7 @@ const StartedPage = () => {
           <img src={blog3} alt="image" loading="lazy" />
         </li>
       </ul>
-      <img
-        className="banner"
-        src="/src/assets/blog1.webp"
-        alt="banner"
-        loading="lazy"
-      ></img>
+      <img className="banner" src={blog1} alt="banner" loading="lazy"></img>
     </div>
   );
 };
