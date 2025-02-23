@@ -21,8 +21,7 @@ const ArticleItem = ({ article, slug, isSinglePage = false }) => {
       console.log("No token available");
       return;
     }
-
-    // Локально обновляем состояние статьи
+    // локально обновляем состояние статьи
     const updatedArticle = {
       ...article,
       favorited: !article.favorited,
@@ -153,7 +152,7 @@ const ArticleItem = ({ article, slug, isSinglePage = false }) => {
       </div>
       <Modal
         title="Are you sure you want to delete this article?"
-        visible={isModalVisible}
+        open={isModalVisible}
         onOk={confirmDelete}
         onCancel={() => setIsModalVisible(false)}
       >

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { useUsers } from "/src/contexts/UsersContext.jsx";
@@ -9,27 +9,51 @@ const UniversalForm = ({ formType }) => {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
     setError,
+    watch,
   } = useForm();
 
-  const { registerUser, fetchLoginUser, updateUserProfile, state, errorUser } =
-    useUsers();
+  const { registerUser, fetchLoginUser, updateUserProfile, state } = useUsers();
   const { userStatusRequest } = state;
   const navigate = useNavigate();
+  const [loginError, setLoginError] = useState(null);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const lastFailedLogin = useRef({ email: "", password: "" });
 
   const onSubmit = async (data) => {
+    if (isSubmitting) return;
+
+    if (
+      formType === "signIn" &&
+      data.email === lastFailedLogin.current.email &&
+      data.password === lastFailedLogin.current.password
+    ) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
       let user;
-
       if (formType === "signIn") {
+        const token = localStorage.getItem("token");
+        if (token) {
+          navigate("/");
+          return;
+        }
+
         user = await fetchLoginUser(data.email, data.password);
-        if (user) navigate("/");
+        if (user) {
+          navigate("/");
+        }
       }
 
       if (formType === "createAccount") {
         user = await registerUser(data.username, data.email, data.password);
-        if (user) navigate("/signin");
+        if (user) {
+          navigate("/signin");
+        }
       }
 
       if (formType === "editProfile") {
@@ -39,30 +63,48 @@ const UniversalForm = ({ formType }) => {
           data.newPassword,
           data.avatarUrl,
         );
-        if (user) navigate("/articles");
+        if (user) {
+          navigate("/articles");
+        }
       }
     } catch (error) {
-      if (error?.response?.data) {
-        Object.keys(error.response.data.errors).forEach((field) => {
-          setError(field, {
-            type: "server",
-            message: error.response.data.errors[field],
-          });
-        });
-      } else {
-        setError("general", {
-          type: "server",
-          message: "Something went wrong!",
-        });
+      if (formType === "signIn") {
+        lastFailedLogin.current = {
+          email: data.email,
+          password: data.password,
+        };
       }
 
-      if (error?.response?.status === 500) {
-        setError("general", {
+      if (error?.response?.data?.errors) {
+        const errorsFromServer = error.response.data.errors;
+        if (errorsFromServer.email) {
+          setError("email", {
+            type: "server",
+            message: errorsFromServer.email,
+          });
+        }
+        if (errorsFromServer.password) {
+          setError("password", {
+            type: "server",
+            message: errorsFromServer.password,
+          });
+        }
+        if (errorsFromServer.general) {
+          setError("password", {
+            type: "server",
+            message: errorsFromServer.general,
+          });
+        }
+      } else {
+        setError("password", {
           type: "server",
-          message: "Internal Server Error. Please try again later.",
+          message: "Invalid email or password",
         });
-        navigate("/");
+
+        setLoginError("Invalid email or password");
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -76,13 +118,14 @@ const UniversalForm = ({ formType }) => {
             : "Edit Profile"}
       </h2>
 
-      {/* Форма для входа */}
       {formType === "signIn" && (
         <>
           <div className="form-group">
             <label>Email address:</label>
             <input
               type="email"
+              name="email"
+              autoComplete="email"
               {...register("email", {
                 required: "Email address is required",
                 pattern: {
@@ -98,6 +141,8 @@ const UniversalForm = ({ formType }) => {
             <label>Password:</label>
             <input
               type="password"
+              name="password"
+              autoComplete="current-password"
               {...register("password", { required: "Password is required" })}
             />
             {errors.password && (
@@ -107,24 +152,15 @@ const UniversalForm = ({ formType }) => {
         </>
       )}
 
-      {/* Форма для регистрации */}
       {formType === "createAccount" && (
         <>
           <div className="form-group">
             <label>Username:</label>
             <input
               type="text"
-              {...register("username", {
-                required: "Username is required",
-                minLength: {
-                  value: 3,
-                  message: "Must be at least 3 characters",
-                },
-                maxLength: {
-                  value: 20,
-                  message: "Must be at most 20 characters",
-                },
-              })}
+              name="username"
+              autoComplete="username"
+              {...register("username", { required: "Username is required" })}
             />
             {errors.username && (
               <p className="error">{errors.username.message}</p>
@@ -135,6 +171,8 @@ const UniversalForm = ({ formType }) => {
             <label>Email address:</label>
             <input
               type="email"
+              name="email"
+              autoComplete="email"
               {...register("email", {
                 required: "Email address is required",
                 pattern: {
@@ -150,17 +188,9 @@ const UniversalForm = ({ formType }) => {
             <label>Password:</label>
             <input
               type="password"
-              {...register("password", {
-                required: "Password is required",
-                minLength: {
-                  value: 6,
-                  message: "Must be at least 6 characters",
-                },
-                maxLength: {
-                  value: 40,
-                  message: "Must be at most 40 characters",
-                },
-              })}
+              name="password"
+              autoComplete="new-password"
+              {...register("password", { required: "Password is required" })}
             />
             {errors.password && (
               <p className="error">{errors.password.message}</p>
@@ -171,6 +201,8 @@ const UniversalForm = ({ formType }) => {
             <label>Repeat Password:</label>
             <input
               type="password"
+              name="repeatPassword"
+              autoComplete="new-password"
               {...register("repeatPassword", {
                 required: "Repeat your password",
                 validate: (value) =>
@@ -193,13 +225,14 @@ const UniversalForm = ({ formType }) => {
         </>
       )}
 
-      {/* Форма для редактирования профиля */}
       {formType === "editProfile" && (
         <>
           <div className="form-group">
             <label>Username:</label>
             <input
               type="text"
+              name="username"
+              autoComplete="username"
               {...register("username", { required: "Username is required" })}
             />
             {errors.username && (
@@ -211,6 +244,8 @@ const UniversalForm = ({ formType }) => {
             <label>Email address:</label>
             <input
               type="email"
+              name="email"
+              autoComplete="email"
               {...register("email", {
                 required: "Email is required",
                 pattern: {
@@ -226,6 +261,8 @@ const UniversalForm = ({ formType }) => {
             <label>New Password:</label>
             <input
               type="password"
+              name="newPassword"
+              autoComplete="new-password"
               {...register("newPassword", {
                 minLength: {
                   value: 6,
@@ -246,6 +283,7 @@ const UniversalForm = ({ formType }) => {
             <label>Avatar Image (URL):</label>
             <input
               type="text"
+              name="avatarUrl"
               {...register("avatarUrl", {
                 pattern: {
                   value: /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/,
@@ -260,7 +298,10 @@ const UniversalForm = ({ formType }) => {
         </>
       )}
 
-      <button type="submit" disabled={userStatusRequest === "pending"}>
+      <button
+        type="submit"
+        disabled={isSubmitting || userStatusRequest === "pending"}
+      >
         {formType === "signIn"
           ? "Login"
           : formType === "createAccount"
@@ -269,7 +310,6 @@ const UniversalForm = ({ formType }) => {
       </button>
 
       {userStatusRequest === "pending" && <Spin fullscreen />}
-      {errorUser && <p className="error">{errorUser}</p>}
 
       <div className="sign-in">
         {formType === "signIn" ? (
