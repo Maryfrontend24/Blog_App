@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import imagemin from "vite-plugin-imagemin";
 
 export default defineConfig({
+  build: {
+    chunkSizeWarningLimit: 1000, // Увеличьте лимит для предупреждения
+  },
   plugins: [
     react(),
     imagemin({
