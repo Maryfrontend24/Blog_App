@@ -765,3 +765,11 @@ input[type="password"].error-input:focus {
   margin-bottom: 5px;
   font-weight: 500;
 }
+
+.article-avatar{
+  display: block;
+  width: 46px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 50%;
+}
