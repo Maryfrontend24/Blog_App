@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Modal, Tag, Avatar } from "antd";
 import { useArticles } from "/src/contexts/ArticlesDataContext.jsx";
 import { useUsers } from "/src/contexts/UsersContext.jsx";
@@ -11,8 +11,15 @@ const ArticleItem = ({ article, slug, isSinglePage = false }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const { state } = useUsers();
   const token = state.token || localStorage.getItem("token");
+  const navigate = useNavigate();
 
-  const handleClick = () => {
+  const handleClick = (e) => {
+    if (!token) {
+      e.preventDefault();
+      navigate("/signin");
+      return;
+    }
+
     dispatch({ type: "SET_SINGLE_ARTICLE", payload: article });
   };
 
@@ -22,21 +29,17 @@ const ArticleItem = ({ article, slug, isSinglePage = false }) => {
       return;
     }
 
-    // Локально обновляем состояние статьи
-    const updatedArticle = {
-      ...article,
-      favorited: !article.favorited,
-      favoritesCount: article.favorited
-        ? article.favoritesCount - 1
-        : article.favoritesCount + 1,
-    };
-    dispatch({ type: "UPDATE_FAVORITED_ARTICLE", payload: updatedArticle });
-
     try {
-      await favoriteArticle(article.slug, token);
+      // Отправляем запрос сначала
+      const response = await favoriteArticle(
+        article.slug,
+        token,
+        article.favorited,
+      );
+
+      dispatch({ type: "UPDATE_FAVORITED_ARTICLE", payload: response });
     } catch (error) {
       console.error("Error favoriting article:", error);
-      dispatch({ type: "UPDATE_FAVORITED_ARTICLE", payload: article });
     }
   };
 
@@ -153,7 +156,7 @@ const ArticleItem = ({ article, slug, isSinglePage = false }) => {
       </div>
       <Modal
         title="Are you sure you want to delete this article?"
-        visible={isModalVisible}
+        open={isModalVisible}
         onOk={confirmDelete}
         onCancel={() => setIsModalVisible(false)}
       >

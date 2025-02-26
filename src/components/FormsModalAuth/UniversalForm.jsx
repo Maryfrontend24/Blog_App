@@ -1,35 +1,157 @@
-import React from "react";
-import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
 import { useUsers } from "/src/contexts/UsersContext.jsx";
+import { useRef, useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import { useNavigate, Link } from "react-router-dom";
+import * as yup from "yup";
 import { Spin } from "antd";
+
+const validationSchemas = {
+  signIn: yup.object().shape({
+    email: yup
+      .string()
+      .required("Email address is required")
+      .matches(
+        /(^[a-z][a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)/,
+        "Invalid email address",
+      ),
+    password: yup.string().required("Password is required"),
+  }),
+
+  createAccount: yup.object().shape({
+    username: yup
+      .string()
+      .min(3, "Username must be 3-20 characters")
+      .max(20, "Username must be 3-20 characters")
+      .required("Username is required"),
+    email: yup
+      .string()
+      .required("Email address is required")
+      .matches(
+        /(^[a-z][a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)/,
+        "Email must start with a lowercase",
+      ),
+    password: yup
+      .string()
+      .min(6, "Password must be 6-40 characters")
+      .max(40, "Password must be 6-40 characters")
+      .required("Password is required"),
+    repeatPassword: yup
+      .string()
+      .oneOf([yup.ref("password")], "Passwords do not match")
+      .required("Repeat your password"),
+    agree: yup.boolean().oneOf([true], "You must agree to proceed"),
+  }),
+  editProfile: yup.object().shape({
+    username: yup.string().required("Username is required"),
+    email: yup
+      .string()
+      .required("Email is required")
+      .matches(
+        /(^[a-z][a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)/,
+        "Email must start with a lowercase letter o corrected",
+      ),
+    newPassword: yup
+      .string()
+      .test(
+        "isValidLength",
+        "Password must contain 6-40 characters",
+        (value) => {
+          if (!value) return true;
+          return value.length >= 6 && value.length <= 40;
+        },
+      ),
+    avatarUrl: yup
+      .string()
+      .url("Invalid URL")
+      .matches(/^https?:\/\//, "URL must start with http:// or https://")
+      .nullable()
+      .notRequired(),
+  }),
+};
 
 const UniversalForm = ({ formType }) => {
   const {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
     setError,
-  } = useForm();
+    watch,
+  } = useForm({
+    resolver: yupResolver(validationSchemas[formType]),
+  });
 
-  const { registerUser, fetchLoginUser, updateUserProfile, state, errorUser } =
-    useUsers();
+  useEffect(() => {
+    console.log("Updated errors в useEffect:", errors);
+  }, [errors]);
+
+  const { registerUser, fetchLoginUser, updateUserProfile, state } = useUsers();
   const { userStatusRequest } = state;
   const navigate = useNavigate();
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState(null);
+  const [signUpError, setSignUpError] = useState(null);
+
+  const lastFailedLogin = useRef({ email: "", password: "" });
+  const lastFailedSignUp = useRef({ email: "", username: "" });
+
+  useEffect(() => {
+    setLoginError(null);
+    setSignUpError(null);
+  }, [watch("email"), watch("password"), watch("username")]); // Очищаем ошибки при вводе новых данных
+
   const onSubmit = async (data) => {
+    if (isSubmitting) return;
+
+    if (formType === "signIn") {
+      if (
+        data.email === lastFailedLogin.current.email &&
+        data.password === lastFailedLogin.current.password
+      ) {
+        setLoginError("Incorrect data. Try again, please");
+        return;
+      }
+    }
+
+    if (formType === "createAccount") {
+      if (
+        data.email === lastFailedSignUp.current.email &&
+        data.username === lastFailedSignUp.current.username
+      ) {
+        setSignUpError("These login or email is already taken! Try again");
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    setLoginError(null);
+    setSignUpError(null);
+
     try {
       let user;
-
       if (formType === "signIn") {
+        const token = localStorage.getItem("token");
+        if (token) {
+          navigate("/");
+          return;
+        }
         user = await fetchLoginUser(data.email, data.password);
-        if (user) navigate("/");
+        if (user) {
+          navigate("/");
+        }
       }
 
       if (formType === "createAccount") {
-        user = await registerUser(data.username, data.email, data.password);
-        if (user) navigate("/signin");
+        user = await registerUser(
+          data.username,
+          data.email,
+          data.password,
+          setError,
+        );
+        if (user) {
+          navigate("/signin");
+        }
       }
 
       if (formType === "editProfile") {
@@ -39,32 +161,70 @@ const UniversalForm = ({ formType }) => {
           data.newPassword,
           data.avatarUrl,
         );
-        if (user) navigate("/articles");
+        if (user) {
+          navigate("/articles");
+        }
       }
     } catch (error) {
-      if (error?.response?.data) {
-        Object.keys(error.response.data.errors).forEach((field) => {
-          setError(field, {
-            type: "server",
-            message: error.response.data.errors[field],
-          });
-        });
-      } else {
-        setError("general", {
-          type: "server",
-          message: "Something went wrong!",
-        });
+      if (formType === "signIn") {
+        lastFailedLogin.current = {
+          email: data.email,
+          password: data.password,
+        };
       }
 
-      if (error?.response?.status === 500) {
-        setError("general", {
-          type: "server",
-          message: "Internal Server Error. Please try again later.",
-        });
-        navigate("/");
+      if (formType === "createAccount") {
+        lastFailedSignUp.current = {
+          email: data.email,
+          username: data.username,
+        };
       }
+
+      if (error?.response?.data?.errors) {
+        const errorsFromServer = error.response.data.errors;
+        console.log("Received errors from server:", errorsFromServer);
+
+        if (errorsFromServer.username) {
+          setError("username", {
+            type: "server",
+            message: "Username is already taken",
+          });
+        }
+
+        if (errorsFromServer.email) {
+          setError("email", {
+            type: "server",
+            message: errorsFromServer.email,
+          });
+        }
+
+        if (errorsFromServer.password) {
+          setError("password", {
+            type: "server",
+            message: errorsFromServer.password,
+          });
+        }
+
+        if (errorsFromServer.general) {
+          setError("password", {
+            type: "server",
+            message: errorsFromServer.general,
+          });
+        }
+      } else {
+        if (formType === "signIn") {
+          setLoginError("Incorrect data. Try again, please");
+        }
+        if (formType === "createAccount") {
+          setSignUpError("These login or email is already taken! Try again");
+        }
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  console.log("errors в UniversalForm", errors);
 
   return (
     <form className="registration-form" onSubmit={handleSubmit(onSubmit)}>
@@ -76,20 +236,15 @@ const UniversalForm = ({ formType }) => {
             : "Edit Profile"}
       </h2>
 
-      {/* Форма для входа */}
       {formType === "signIn" && (
         <>
           <div className="form-group">
             <label>Email address:</label>
             <input
               type="email"
-              {...register("email", {
-                required: "Email address is required",
-                pattern: {
-                  value: /^\S+@\S+\.\S+$/,
-                  message: "Invalid email format",
-                },
-              })}
+              name="email"
+              autoComplete="email"
+              {...register("email")}
             />
             {errors.email && <p className="error">{errors.email.message}</p>}
           </div>
@@ -98,33 +253,28 @@ const UniversalForm = ({ formType }) => {
             <label>Password:</label>
             <input
               type="password"
-              {...register("password", { required: "Password is required" })}
+              name="password"
+              autoComplete="current-password"
+              {...register("password")}
             />
             {errors.password && (
               <p className="error">{errors.password.message}</p>
             )}
+            {loginError && <p className="error">{loginError}</p>}
           </div>
         </>
       )}
 
-      {/* Форма для регистрации */}
       {formType === "createAccount" && (
         <>
           <div className="form-group">
             <label>Username:</label>
             <input
               type="text"
-              {...register("username", {
-                required: "Username is required",
-                minLength: {
-                  value: 3,
-                  message: "Must be at least 3 characters",
-                },
-                maxLength: {
-                  value: 20,
-                  message: "Must be at most 20 characters",
-                },
-              })}
+              name="username"
+              autoComplete="username"
+              {...register("username")}
+              className={errors.username ? "error-input" : ""}
             />
             {errors.username && (
               <p className="error">{errors.username.message}</p>
@@ -135,32 +285,21 @@ const UniversalForm = ({ formType }) => {
             <label>Email address:</label>
             <input
               type="email"
-              {...register("email", {
-                required: "Email address is required",
-                pattern: {
-                  value: /^\S+@\S+\.\S+$/,
-                  message: "Invalid email format",
-                },
-              })}
+              name="email"
+              autoComplete="email"
+              {...register("email")}
             />
             {errors.email && <p className="error">{errors.email.message}</p>}
+            {signUpError && <p className="error">{signUpError}</p>}
           </div>
 
           <div className="form-group">
             <label>Password:</label>
             <input
               type="password"
-              {...register("password", {
-                required: "Password is required",
-                minLength: {
-                  value: 6,
-                  message: "Must be at least 6 characters",
-                },
-                maxLength: {
-                  value: 40,
-                  message: "Must be at most 40 characters",
-                },
-              })}
+              name="password"
+              autoComplete="new-password"
+              {...register("password")}
             />
             {errors.password && (
               <p className="error">{errors.password.message}</p>
@@ -171,11 +310,9 @@ const UniversalForm = ({ formType }) => {
             <label>Repeat Password:</label>
             <input
               type="password"
-              {...register("repeatPassword", {
-                required: "Repeat your password",
-                validate: (value) =>
-                  value === watch("password") || "Passwords do not match",
-              })}
+              name="repeatPassword"
+              autoComplete="new-password"
+              {...register("repeatPassword")}
             />
             {errors.repeatPassword && (
               <p className="error">{errors.repeatPassword.message}</p>
@@ -183,27 +320,26 @@ const UniversalForm = ({ formType }) => {
           </div>
 
           <div className="form-group__checkbox">
-            <input
-              type="checkbox"
-              {...register("agree", { required: "You must agree" })}
-            />
+            <input type="checkbox" {...register("agree")} />
             <label>I agree to the processing of my personal information</label>
             {errors.agree && <p className="error">{errors.agree.message}</p>}
           </div>
+          {/*{signUpError && <p className="error">{signUpError}</p>}*/}
         </>
       )}
 
-      {/* Форма для редактирования профиля */}
       {formType === "editProfile" && (
         <>
           <div className="form-group">
             <label>Username:</label>
             <input
               type="text"
-              {...register("username", { required: "Username is required" })}
+              name="username"
+              autoComplete="username"
+              {...register("username")}
             />
             {errors.username && (
-              <p className="error">{errors.username.message}</p>
+              <p className="error-message">{errors.username.message}</p>
             )}
           </div>
 
@@ -211,13 +347,9 @@ const UniversalForm = ({ formType }) => {
             <label>Email address:</label>
             <input
               type="email"
-              {...register("email", {
-                required: "Email is required",
-                pattern: {
-                  value: /^\S+@\S+\.\S+$/,
-                  message: "Invalid email format",
-                },
-              })}
+              name="email"
+              autoComplete="email"
+              {...register("email")}
             />
             {errors.email && <p className="error">{errors.email.message}</p>}
           </div>
@@ -226,16 +358,9 @@ const UniversalForm = ({ formType }) => {
             <label>New Password:</label>
             <input
               type="password"
-              {...register("newPassword", {
-                minLength: {
-                  value: 6,
-                  message: "Password must contain 6-40 characters",
-                },
-                maxLength: {
-                  value: 40,
-                  message: "Password must contain 6-40 characters",
-                },
-              })}
+              name="newPassword"
+              autoComplete="new-password"
+              {...register("newPassword")}
             />
             {errors.newPassword && (
               <p className="error">{errors.newPassword.message}</p>
@@ -244,15 +369,7 @@ const UniversalForm = ({ formType }) => {
 
           <div className="form-group">
             <label>Avatar Image (URL):</label>
-            <input
-              type="text"
-              {...register("avatarUrl", {
-                pattern: {
-                  value: /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/,
-                  message: "Invalid URL",
-                },
-              })}
-            />
+            <input type="text" name="avatarUrl" {...register("avatarUrl")} />
             {errors.avatarUrl && (
               <p className="error">{errors.avatarUrl.message}</p>
             )}
@@ -260,7 +377,10 @@ const UniversalForm = ({ formType }) => {
         </>
       )}
 
-      <button type="submit" disabled={userStatusRequest === "pending"}>
+      <button
+        type="submit"
+        disabled={isSubmitting || userStatusRequest === "pending"}
+      >
         {formType === "signIn"
           ? "Login"
           : formType === "createAccount"
@@ -268,9 +388,7 @@ const UniversalForm = ({ formType }) => {
             : "Save"}
       </button>
 
-      {userStatusRequest === "pending" && <Spin fullscreen />}
-      {errorUser && <p className="error">{errorUser}</p>}
-
+      {isSubmitting && <Spin fullscreen />}
       <div className="sign-in">
         {formType === "signIn" ? (
           <p>

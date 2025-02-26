@@ -6,7 +6,7 @@ import defImage from "/src/assets/defImage.jpg";
 
 const UsersContext = createContext();
 
-// state User
+// state user
 const initialState = {
   username: "",
   email: "",
@@ -17,6 +17,7 @@ const initialState = {
   userStatusRequest: null,
   token: localStorage.getItem("token"),
   serverErrors: null,
+  lastFailedAttempt: { email: null, password: null },
 };
 
 console.log("Initial token:", localStorage.getItem("token"));
@@ -45,8 +46,17 @@ const userReducer = (state, action) => {
         ...state,
         errorUser: action.payload,
         userStatusRequest: "rejected",
-        serverError: action.payload === "500" ? "500" : null,
+        serverErrors: action.payload, // Добавляем ошибку в сост.
       };
+    case "SET_LAST_FAILED_ATTEMPT":
+      return {
+        ...state,
+        lastFailedAttempt: action.payload, // Обновляем данные о неудачной попытке
+        errorUser: action.payload.email
+          ? state.errorUser || "Incorrect email or password. Try again."
+          : state.errorUser,
+      };
+
     case "CLEAR_ERROR":
       return { ...state, errorUser: null };
     case "LOGOUT":
@@ -72,59 +82,42 @@ export const UsersProvider = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token"); // Проверяем токен
+    const token = localStorage.getItem("token");
+    if (token) {
+      axios.defaults.headers.common["Authorization"] = `Token ${token}`;
 
-    if (storedUser && token) {
-      const parsedUser = JSON.parse(storedUser);
-      axios.defaults.headers.common["Authorization"] = `Token ${token}`; // Устанавливаем токен в заголовки для axios
-      dispatch({
-        type: "SET_USER",
-        payload: parsedUser,
-      });
-    } else {
-      dispatch({ type: "LOGOUT" });
+      // Загружаем пользователя из LocalStr
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        dispatch({ type: "SET_USER", payload: user });
+      }
     }
   }, []);
 
-  const registerUser = async (username, email, password) => {
-    dispatch({ type: "SET_LOADING" });
-
-    try {
-      const response = await axios.post(`${BASE_URL}/users`, {
-        user: { username, email, password },
+  const registerUser = async (username, email, password, setError) => {
+    if (
+      state.lastFailedAttempt.email === email &&
+      state.lastFailedAttempt.password === password
+    ) {
+      dispatch({
+        type: "ERROR",
+        payload: "This email has already been used. Try again.",
       });
-
-      console.log("User registered successfully:", response.data);
-      navigate("/signin"); // Перенаправляем на страницу входа
-    } catch (error) {
-      console.error("Error during registration:", error);
-
-      const errorMessage =
-        error.response && error.response.data.errors
-          ? error.response.data.errors.body[0]
-          : error.response
-            ? `Error ${error.response.status}: ${error.response.statusText}`
-            : error.message || "Network error";
-
-      if (error.response && error.response.status === 500) {
-        dispatch({
-          type: "ERROR",
-          payload: "500",
-        });
-      } else {
-        dispatch({
-          type: "ERROR",
-          payload: errorMessage,
-        });
-      }
-    } finally {
-      dispatch({ type: "STOP_LOADING" });
+      return; //  и не отправляем повторный запрос
     }
-  };
 
-  const fetchLoginUser = async (email, password) => {
-    dispatch({ type: "SET_LOADING" }); // Запускаем спиннер
+    if (
+      state.lastFailedAttempt.email !== email ||
+      state.lastFailedAttempt.password !== password
+    ) {
+      dispatch({
+        type: "SET_LAST_FAILED_ATTEMPT",
+        payload: { email: null, password: null },
+      });
+    }
+
+    dispatch({ type: "SET_LOADING" });
 
     const timeout = setTimeout(() => {
       dispatch({
@@ -132,25 +125,20 @@ export const UsersProvider = ({ children }) => {
         payload: "Request timeout. Please try again.",
       });
       dispatch({ type: "STOP_LOADING" });
-    }, 10000);
+    }, 5000);
 
     try {
       const response = await axios.post(
-        `${BASE_URL}/users/login`,
+        `${BASE_URL}/users`,
         {
-          user: {
-            email,
-            password,
-          },
+          user: { username, email, password },
         },
-        {
-          headers: { "Content-Type": "application/json" },
-        },
+        { headers: { "Content-Type": "application/json" } },
       );
 
       const { user } = response.data;
 
-      if (!user || !user.token) {
+      if (!user?.token) {
         throw new Error("Token not received or invalid");
       }
 
@@ -166,23 +154,22 @@ export const UsersProvider = ({ children }) => {
           token: user.token,
         }),
       );
-
       localStorage.setItem("token", user.token);
+
       axios.defaults.headers.common["Authorization"] = `Token ${user.token}`;
 
+      dispatch({ type: "SET_USER", payload: user });
+
+      // Сбрасываем данные о неудачной попытке
       dispatch({
-        type: "SET_USER",
-        payload: {
-          username: user.username,
-          email: user.email,
-          bio: user.bio,
-          image: user.image,
-          token: user.token,
-        },
+        type: "SET_LAST_FAILED_ATTEMPT",
+        payload: { email: null, password: null },
       });
 
-      navigate("/articles");
+      return user;
     } catch (error) {
+      clearTimeout(timeout);
+
       const errorMessage =
         error.response && error.response.data.errors
           ? error.response.data.errors.body[0]
@@ -190,24 +177,157 @@ export const UsersProvider = ({ children }) => {
             ? `Error ${error.response.status}: ${error.response.statusText}`
             : error.message || "Network error";
 
-      clearTimeout(timeout);
-
-      if (error.response && error.response.status === 500) {
-        // Показываем сообщение пользователю перед перенаправлением
+      if (error.response?.status === 500) {
         dispatch({
           type: "ERROR",
           payload: "Internal Server Error. Please try again later.",
         });
         alert("Произошла ошибка на сервере. Перенаправляем на главную.");
-
-        // Добавляем задержку перед редиректом
-        setTimeout(() => {
-          navigate("/");
-        }, 3000);
+        setTimeout(() => navigate("/"), 3000);
       } else {
+        dispatch({ type: "ERROR", payload: errorMessage });
+
+        // Сохраняем данные неудачн регистрации
+        dispatch({
+          type: "SET_LAST_FAILED_ATTEMPT",
+          payload: { email, password },
+        });
+
+        //  сервер вернул ошибки, передаем их в setError
+        if (error.response?.data?.errors) {
+          const errorsFromServer = error.response.data.errors;
+          if (errorsFromServer.username) {
+            setError("username", {
+              type: "server",
+              message: "Username is already taken",
+            });
+          }
+          if (errorsFromServer.email) {
+            setError("email", {
+              type: "server",
+              message: "Email is already registered",
+            });
+          }
+          if (errorsFromServer.password) {
+            setError("password", {
+              type: "server",
+              message: errorsFromServer.password,
+            });
+          }
+        }
+      }
+    } finally {
+      dispatch({ type: "STOP_LOADING" });
+    }
+  };
+
+  const fetchLoginUser = async (email, password) => {
+    const storedToken = localStorage.getItem("token");
+
+    if (storedToken) {
+      axios.defaults.headers.common["Authorization"] = `Token ${storedToken}`;
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        dispatch({ type: "SET_USER", payload: user });
+      }
+      navigate("/articles");
+      return;
+    }
+
+    if (
+      state.lastFailedAttempt.email === email &&
+      state.lastFailedAttempt.password === password
+    ) {
+      dispatch({
+        type: "ERROR",
+        payload: "Incorrect email or password. Try again.",
+      });
+      return; // не отправляем запроc!
+    }
+
+    if (
+      state.lastFailedAttempt.email !== email ||
+      state.lastFailedAttempt.password !== password
+    ) {
+      dispatch({
+        type: "SET_LAST_FAILED_ATTEMPT",
+        payload: { email: null, password: null },
+      });
+    }
+
+    dispatch({ type: "SET_LOADING" });
+
+    const timeout = setTimeout(() => {
+      dispatch({
+        type: "ERROR",
+        payload: "Request timeout. Please try again.",
+      });
+      dispatch({ type: "STOP_LOADING" });
+    }, 5000);
+
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/users/login`,
+        { user: { email, password } },
+        { headers: { "Content-Type": "application/json" } },
+      );
+
+      const { user } = response.data;
+
+      if (!user?.token) {
+        throw new Error("Token not received or invalid");
+      }
+
+      clearTimeout(timeout);
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          username: user.username,
+          email: user.email,
+          bio: user.bio,
+          image: user.image,
+          token: user.token,
+        }),
+      );
+      localStorage.setItem("token", user.token);
+
+      axios.defaults.headers.common["Authorization"] = `Token ${user.token}`;
+
+      dispatch({ type: "SET_USER", payload: user });
+
+      // После успешного входа сбрасываем данные о  попытке
+      dispatch({
+        type: "SET_LAST_FAILED_ATTEMPT",
+        payload: { email: null, password: null },
+      });
+
+      navigate("/articles");
+    } catch (error) {
+      clearTimeout(timeout);
+
+      const errorMessage =
+        error.response && error.response.data.errors
+          ? error.response.data.errors.body[0]
+          : error.response
+            ? `Error ${error.response.status}: ${error.response.statusText}`
+            : error.message || "Network error";
+
+      if (error.response?.status === 500) {
         dispatch({
           type: "ERROR",
-          payload: errorMessage,
+          payload: "Internal Server Error. Please try again later.",
+        });
+        alert("Произошла ошибка на сервере. Перенаправляем на главную.");
+        setTimeout(() => navigate("/"), 3000);
+      } else {
+        dispatch({ type: "ERROR", payload: errorMessage });
+
+        // Сохраняем данные неудачного входа
+        dispatch({
+          type: "SET_LAST_FAILED_ATTEMPT",
+          payload: { email, password },
         });
       }
     } finally {
@@ -278,22 +398,14 @@ export const UsersProvider = ({ children }) => {
 
   // выход
   const logoutUser = () => {
-    console.log("Logging out...");
-
-    // Удаляем из localStorage
+    localStorage.removeItem("user");
     localStorage.removeItem("token");
-    localStorage.removeItem("user"); // Удаляем данные пользователя
-    console.log("Token and user data removed from localStorage");
 
-    // Удаляем заголовок авторизации для axios
     delete axios.defaults.headers.common["Authorization"];
-    console.log("Authorization header removed");
-    dispatch({ type: "LOGOUT" });
-    console.log("Dispatching LOGOUT action");
 
-    // Перенаправляем
+    dispatch({ type: "LOGOUT" });
+
     navigate("/signin");
-    console.log("Redirecting to /signin");
   };
 
   return (

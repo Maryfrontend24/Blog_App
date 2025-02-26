@@ -296,7 +296,6 @@ input[type="checkbox"] {
 
 .form-group__checkbox {
   display: flex;
-  margin-bottom: 10px;
 }
 .form-group__checkbox input {
   margin-right: 10px;
@@ -738,4 +737,31 @@ body img.banner {
 .ant-result .ant-btn {
   -webkit-align-items: center;
   -webkit-justify-content: center;
+}
+
+/* Стили для отображения ошибки */
+.error {
+  color: red; /* Красный цвет для текста ошибки */
+  font-size: 14px; /* Размер шрифта */
+  margin-top: 5px; /* Отступ сверху */
+}
+
+/* Стили для поля с ошибкой */
+input[type="text"].error-input,
+input[type="email"].error-input,
+input[type="password"].error-input {
+  border: 1px solid red; /* Красная рамка вокруг поля */
+}
+
+input[type="text"].error-input:focus,
+input[type="email"].error-input:focus,
+input[type="password"].error-input:focus {
+  border-color: darkred; /* Темно-красная рамка при фокусе */
+}
+
+.error {
+  color: #d32f2f; /* Красный цвет текста ошибки */
+  font-size: 15px;
+  margin-bottom: 5px;
+  font-weight: 500;
 }
