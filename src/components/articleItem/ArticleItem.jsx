@@ -125,7 +125,7 @@ const ArticleItem = ({ article, slug, isSinglePage = false }) => {
               {new Date(article.createdAt).toLocaleDateString()}
             </div>
           </div>
-          <Avatar
+          <img
             src={article.author?.image || defImage}
             className="article-avatar"
           />
