@@ -1,0 +1,273 @@
+Index: src/contexts/ArticlesDataContext.jsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import React, {\n  createContext,\n  useContext,\n  useReducer,\n  useState,\n  useEffect,\n} from \"react\";\nimport { BASE_URL } from \"../utils/constant.jsx\";\nimport axios from \"axios\";\nimport { useNavigate } from \"react-router-dom\";\n\nconst ArticlesContext = createContext();\n\n// state Article\nconst initialState = {\n  articles: [],\n  singleArticle: null,\n  articlesCount: null,\n  articleRequestStatus: \"\",\n  errorArticleServer: null,\n  articleIsCreated: false,\n  loadingArticles: false,\n  loadingArticle: false,\n  likeCount: 0,\n  favorited: false,\n};\n// Редьюсер\nconst articleReducer = (state, action) => {\n  switch (action.type) {\n    case \"SET_LOADING_ARTICLES\":\n      return { ...state, loadingArticles: action.payload };\n    case \"SET_LOADING_ARTICLE\":\n      return { ...state, loadingArticle: action.payload };\n    case \"SET_ARTICLES\":\n      return { ...state, articles: action.payload, articleRequestStatus: \"\" };\n    case \"SET_SINGLE_ARTICLE\":\n      return {\n        ...state,\n        singleArticle: action.payload,\n        articleRequestStatus: \"\",\n      };\n    case \"SET_ARTICLES_COUNT\":\n      return { ...state, articlesCount: action.payload };\n    case \"UPDATE_FAVORITED_ARTICLE\":\n      return {\n        ...state,\n        articles: state.articles.map((article) =>\n          article.slug === action.payload.slug ? action.payload : article,\n        ),\n      };\n    case \"PENDING\":\n      return {\n        ...state,\n        articleRequestStatus: \"pending\",\n        errorArticleServer: null,\n      };\n    case \"ERROR\":\n      return {\n        ...state,\n        errorArticleServer: action.payload,\n        articleRequestStatus: \"\",\n      };\n    case \"CREATE_SUCCESS\":\n      return {\n        ...state,\n        articleIsCreated: true,\n        articles: [action.payload, ...state.articles],\n      };\n    case \"CLEAR_ERROR\":\n      return { ...state, errorArticleServer: null };\n    case \"LIKE_ARTICLE\":\n      return {\n        ...state,\n        articles: state.articles.map((article) =>\n          article.slug === action.payload.slug\n            ? {\n                ...article,\n                favorited: !article.favorited,\n                favoritesCount: article.favorited\n                  ? article.favoritesCount - 1\n                  : article.favoritesCount + 1,\n              }\n            : article,\n        ),\n      };\n    case \"DELETE_ARTICLE\":\n      return {\n        ...state,\n        articles: state.articles.filter(\n          (article) => article.slug !== action.payload,\n        ),\n        articleRequestStatus: \"\",\n      };\n    default:\n      return state;\n  }\n};\n\nexport const ArticlesProvider = ({ children }) => {\n  const [state, dispatch] = useReducer(articleReducer, initialState);\n  const navigate = useNavigate();\n  const [error, setError] = useState(null);\n  const [currentPage, setCurrentPage] = useState(1);\n  const limit = 10;\n\n  // const getArticleList = async () => {\n  //   dispatch({ type: \"SET_LOADING_ARTICLES\", payload: true });\n  //   const url = `${BASE_URL}/articles`;\n  //   const offset = (currentPage - 1) * limit;\n  //\n  //   try {\n  //     const res = await axios.get(url, {\n  //       params: {\n  //         limit: limit,\n  //         offset: offset,\n  //       },\n  //     });\n  //\n  //     if (res.data.articles) {\n  //       dispatch({ type: \"SET_ARTICLES\", payload: res.data.articles });\n  //       dispatch({\n  //         type: \"SET_ARTICLES_COUNT\",\n  //         payload: res.data.articlesCount,\n  //       });\n  //     } else {\n  //       console.error(\"Articles not found :(\");\n  //     }\n  //   } catch (error) {\n  //     dispatch({\n  //       type: \"ERROR\",\n  //       payload: error.message || \"Произошла ошибка при получении статей\",\n  //     });\n  //   } finally {\n  //     dispatch({ type: \"SET_LOADING_ARTICLES\", payload: false });\n  //   }\n  // };\n  //\n  // useEffect(() => {\n  //   getArticleList();\n  // }, [currentPage]);\n\n  const getArticleList = async () => {\n    dispatch({ type: \"SET_LOADING_ARTICLES\", payload: true });\n    const url = `${BASE_URL}/articles`;\n    const offset = (currentPage - 1) * limit;\n\n    try {\n      const res = await axios.get(url, {\n        params: {\n          limit: limit,\n          offset: offset,\n        },\n      });\n\n      if (res.data.articles) {\n        dispatch({ type: \"SET_ARTICLES\", payload: res.data.articles });\n        dispatch({\n          type: \"SET_ARTICLES_COUNT\",\n          payload: res.data.articlesCount,\n        });\n      } else {\n        console.error(\"Articles not found :(\");\n      }\n    } catch (error) {\n      // Обработка ошибки, например, ошибка 500\n      const errorMessage =\n        error.response && error.response.status === 500\n          ? \"Internal Server Error. Please try again later.\"\n          : error.message || \"Произошла ошибка при получении статей\";\n\n      dispatch({\n        type: \"ERROR\",\n        payload: errorMessage,\n      });\n    } finally {\n      dispatch({ type: \"SET_LOADING_ARTICLES\", payload: false });\n    }\n  };\n\n  useEffect(() => {\n    getArticleList();\n  }, [currentPage]);\n\n  const fetchSingleArticle = async (slug) => {\n    dispatch({ type: \"SET_LOADING_ARTICLE\", payload: true });\n    try {\n      const response = await axios.get(`${BASE_URL}/articles/${slug}`);\n      dispatch({ type: \"SET_SINGLE_ARTICLE\", payload: response.data.article });\n    } catch (error) {\n      const errorMessage =\n        error.response && error.response.status === 500\n          ? \"Internal Server Error. Please try again later.\"\n          : error.response\n            ? error.response.statusText\n            : \"Network error\";\n      dispatch({ type: \"ERROR\", payload: errorMessage });\n    } finally {\n      dispatch({ type: \"SET_LOADING_ARTICLE\", payload: false });\n    }\n  };\n\n  const createArticle = async (articleData, token) => {\n    dispatch({ type: \"SET_LOADING_ARTICLE\", payload: true });\n\n    try {\n      if (!token) {\n        throw new Error(\"Not authenticated\");\n      }\n\n      const response = await axios.post(\n        `${BASE_URL}/articles`,\n        { article: articleData },\n        {\n          headers: {\n            Authorization: `Token ${token}`,\n            \"Content-Type\": \"application/json\",\n          },\n        },\n      );\n\n      dispatch({ type: \"CREATE_SUCCESS\", payload: response.data.article });\n\n      return response.data.article;\n    } catch (error) {\n      dispatch({\n        type: \"ERROR\",\n        payload: error.response?.data || \"Network error\",\n      });\n      throw error;\n    } finally {\n      dispatch({ type: \"SET_LOADING_ARTICLE\", payload: false });\n    }\n  };\n\n  const updateArticle = async (slug, articleData, token) => {\n    dispatch({ type: \"PENDING\" });\n\n    try {\n      const response = await axios.put(\n        `${BASE_URL}/articles/${slug}`,\n        { article: articleData },\n        {\n          headers: {\n            Authorization: `Token ${token}`,\n          },\n        },\n      );\n\n      dispatch({ type: \"SET_SINGLE_ARTICLE\", payload: response.data.article });\n    } catch (error) {\n      const errorMessage = error.response\n        ? error.response.statusText\n        : \"Network error\";\n      dispatch({ type: \"ERROR\", payload: errorMessage });\n      console.error(\"Error updating article:\", error);\n    }\n  };\n\n  const deleteArticle = async (slug, token) => {\n    try {\n      const response = await axios.delete(`${BASE_URL}/articles/${slug}`, {\n        headers: {\n          Authorization: `Token ${token}`,\n        },\n      });\n\n      // Если код ответа 200 или 204,то удаление прошло успешно\n      if (response.status === 200 || response.status === 204) {\n        dispatch({ type: \"DELETE_ARTICLE\", payload: slug });\n\n        // Переадресовываем\n        navigate(\"/articles\");\n      } else {\n        dispatch({\n          type: \"ERROR\",\n          payload: \"Failed to delete article: \" + response.statusText,\n        });\n      }\n    } catch (error) {\n      console.error(\"Error deleting article:\", error);\n      dispatch({\n        type: \"ERROR\",\n        payload: error.response ? error.response.statusText : \"Network error\",\n      });\n    }\n  };\n\n  // Like\n  const favoriteArticle = async (slug, token) => {\n    try {\n      const response = await axios.post(\n        `${BASE_URL}/articles/${slug}/favorite`, // Используем BASE_URL\n        {},\n        {\n          headers: { Authorization: `Bearer ${token}` },\n        },\n      );\n\n      // Обновляем статью в состоянии\n      dispatch({\n        type: \"UPDATE_FAVORITED_ARTICLE\",\n        payload: response.data.article,\n      });\n    } catch (error) {\n      console.error(\"Error favoriting article:\", error);\n      throw error;\n    }\n  };\n\n  return (\n    <ArticlesContext.Provider\n      value={{\n        state,\n        error,\n        dispatch,\n        setError,\n        currentPage,\n        setCurrentPage,\n        fetchSingleArticle,\n        getArticleList,\n        createArticle,\n        updateArticle,\n        deleteArticle,\n        favoriteArticle,\n      }}\n    >\n      {children}\n    </ArticlesContext.Provider>\n  );\n};\n\nexport const useArticles = () => {\n  const context = useContext(ArticlesContext);\n\n  if (!context) {\n    throw new Error(\"useArticles must be used within an ArticlesProvider\");\n  }\n  return context;\n};\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/contexts/ArticlesDataContext.jsx b/src/contexts/ArticlesDataContext.jsx
+--- a/src/contexts/ArticlesDataContext.jsx	(revision 727fe41700a51edc74e873ffee4f79967788589a)
++++ b/src/contexts/ArticlesDataContext.jsx	(date 1740479861680)
+@@ -44,8 +44,14 @@
+     case "UPDATE_FAVORITED_ARTICLE":
+       return {
+         ...state,
+-        articles: state.articles.map((article) =>
+-          article.slug === action.payload.slug ? action.payload : article,
++        articles: state.articles.map((a) =>
++          a.slug === action.payload.slug
++            ? {
++                ...a,
++                favorited: action.payload.favorited,
++                favoritesCount: action.payload.favoritesCount,
++              }
++            : a,
+         ),
+       };
+     case "PENDING":
+@@ -71,18 +77,16 @@
+     case "LIKE_ARTICLE":
+       return {
+         ...state,
+-        articles: state.articles.map((article) =>
+-          article.slug === action.payload.slug
+-            ? {
+-                ...article,
+-                favorited: !article.favorited,
+-                favoritesCount: article.favorited
+-                  ? article.favoritesCount - 1
+-                  : article.favoritesCount + 1,
+-              }
+-            : article,
+-        ),
++        articles: state.articles.map((a) => {
++          if (a.slug !== action.payload.slug) return a; // Оставляем остальные статьи без изменений
++          a.favorited = !a.favorited;
++          a.favoritesCount = a.favorited
++            ? a.favoritesCount + 1
++            : a.favoritesCount - 1;
++          return a;
++        }),
+       };
++
+     case "DELETE_ARTICLE":
+       return {
+         ...state,
+@@ -286,23 +290,21 @@
+   };
+ 
+   // Like
+-  const favoriteArticle = async (slug, token) => {
++  const favoriteArticle = async (slug, token, isFavorited) => {
+     try {
+-      const response = await axios.post(
+-        `${BASE_URL}/articles/${slug}/favorite`, // Используем BASE_URL
+-        {},
+-        {
+-          headers: { Authorization: `Bearer ${token}` },
+-        },
+-      );
++      const method = isFavorited ? "DELETE" : "POST"; // Если уже лайкнули → удаляем
++      const response = await axios({
++        method,
++        url: `${BASE_URL}/articles/${slug}/favorite`,
++        headers: { Authorization: `Bearer ${token}` },
++      });
+ 
+-      // Обновляем статью в состоянии
+       dispatch({
+         type: "UPDATE_FAVORITED_ARTICLE",
+         payload: response.data.article,
+       });
+     } catch (error) {
+-      console.error("Error favoriting article:", error);
++      console.error("Error toggling favorite:", error);
+       throw error;
+     }
+   };
+Index: package.json
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>{\n  \"name\": \"blogapp\",\n  \"private\": true,\n  \"version\": \"0.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"vite\",\n    \"build\": \"vite build\",\n    \"preview\": \"vite preview\",\n    \"prettier\": \"prettier . --check --ignore-unknown\",\n    \"prettier:fix\": \"prettier . -w\",\n    \"lint\": \"eslint \\\"src/**/*.{js,jsx}\\\"\",\n    \"lint:fix\": \"eslint \\\"src/**/*.{js,jsx}\\\" --fix --color\",\n    \"format\": \"prettier ./src --write\",\n    \"precommit\": \"lint-staged\",\n    \"prepare\": \"husky\"\n  },\n  \"browserslist\": {\n    \"production\": [\n      \">0.2%\",\n      \"not dead\",\n      \"not op_mini all\"\n    ]\n  },\n  \"dependencies\": {\n    \"@ant-design/icons\": \"^5.6.0\",\n    \"@reduxjs/toolkit\": \"^2.5.1\",\n    \"antd\": \"^5.23.3\",\n    \"axios\": \"^1.7.9\",\n    \"date-fns\": \"^4.1.0\",\n    \"markdown-to-jsx\": \"^7.7.3\",\n    \"marked\": \"^15.0.6\",\n    \"react\": \"^18.3.1\",\n    \"react-dom\": \"^18.3.1\",\n    \"react-hook-form\": \"^7.54.2\",\n    \"react-markdown\": \"^9.0.3\",\n    \"react-redux\": \"^9.2.0\",\n    \"react-router-dom\": \"^6.0.0\",\n    \"react-toastify\": \"^11.0.3\",\n    \"redux\": \"^5.0.1\",\n    \"redux-thunk\": \"^3.1.0\",\n    \"uuid\": \"^11.0.5\",\n    \"vite-plugin-imagemin\": \"^0.6.1\"\n  },\n  \"devDependencies\": {\n    \"@babel/plugin-proposal-class-properties\": \"^7.18.6\",\n    \"@eslint/js\": \"^9.13.0\",\n    \"@types/react\": \"^18.3.12\",\n    \"@types/react-dom\": \"^18.3.1\",\n    \"@vitejs/plugin-react\": \"^4.3.3\",\n    \"eslint\": \"^9.14.0\",\n    \"eslint-config-prettier\": \"^9.1.0\",\n    \"eslint-config-react-app\": \"^7.0.1\",\n    \"eslint-plugin-html\": \"^8.1.2\",\n    \"eslint-plugin-import\": \"^2.31.0\",\n    \"eslint-plugin-jsx-a11y\": \"^6.10.2\",\n    \"eslint-plugin-prettier\": \"^5.2.1\",\n    \"eslint-plugin-react\": \"^7.37.2\",\n    \"eslint-plugin-react-hooks\": \"^5.0.0\",\n    \"eslint-plugin-react-refresh\": \"^0.4.14\",\n    \"globals\": \"^15.11.0\",\n    \"husky\": \"^9.1.7\",\n    \"lint-staged\": \"^15.3.0\",\n    \"prettier\": \"^3.3.3\",\n    \"terser\": \"^5.39.0\",\n    \"vite\": \"^5.4.10\"\n  },\n  \"overrides\": {\n    \"eslint\": \"^9.14.0\"\n  },\n  \"eslintConfig\": {\n    \"extends\": [\n      \"react-app\",\n      \"react-app/jest\"\n    ]\n  },\n  \"lint-staged\": {\n    \"*.(js|jsx)\": [\n      \"npm run lint:fix\"\n    ],\n    \"*.js\": \"prettier --write\"\n  }\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/package.json b/package.json
+--- a/package.json	(revision 727fe41700a51edc74e873ffee4f79967788589a)
++++ b/package.json	(date 1740479861686)
+@@ -24,6 +24,7 @@
+   },
+   "dependencies": {
+     "@ant-design/icons": "^5.6.0",
++    "@hookform/resolvers": "^4.1.2",
+     "@reduxjs/toolkit": "^2.5.1",
+     "antd": "^5.23.3",
+     "axios": "^1.7.9",
+@@ -40,7 +41,8 @@
+     "redux": "^5.0.1",
+     "redux-thunk": "^3.1.0",
+     "uuid": "^11.0.5",
+-    "vite-plugin-imagemin": "^0.6.1"
++    "vite-plugin-imagemin": "^0.6.1",
++    "yup": "^1.6.1"
+   },
+   "devDependencies": {
+     "@babel/plugin-proposal-class-properties": "^7.18.6",
+Index: package-lock.json
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/package-lock.json b/package-lock.json
+--- a/package-lock.json	(revision 727fe41700a51edc74e873ffee4f79967788589a)
++++ b/package-lock.json	(date 1740479861848)
+@@ -9,6 +9,7 @@
+       "version": "0.0.0",
+       "dependencies": {
+         "@ant-design/icons": "^5.6.0",
++        "@hookform/resolvers": "^4.1.2",
+         "@reduxjs/toolkit": "^2.5.1",
+         "antd": "^5.23.3",
+         "axios": "^1.7.9",
+@@ -25,7 +26,8 @@
+         "redux": "^5.0.1",
+         "redux-thunk": "^3.1.0",
+         "uuid": "^11.0.5",
+-        "vite-plugin-imagemin": "^0.6.1"
++        "vite-plugin-imagemin": "^0.6.1",
++        "yup": "^1.6.1"
+       },
+       "devDependencies": {
+         "@babel/plugin-proposal-class-properties": "^7.18.6",
+@@ -2522,6 +2524,17 @@
+         "node": "^18.18.0 || ^20.9.0 || >=21.1.0"
+       }
+     },
++    "node_modules/@hookform/resolvers": {
++      "version": "4.1.2",
++      "resolved": "https://registry.npmjs.org/@hookform/resolvers/-/resolvers-4.1.2.tgz",
++      "integrity": "sha512-wl6H9c9wLOZMJAqGLEVKzbCkxJuV+BYuLFZFCQtCwMe0b3qQk4kUBd/ZAj13SwcSqcx86rCgSCyngQfmA6DOWg==",
++      "dependencies": {
++        "@standard-schema/utils": "^0.3.0"
++      },
++      "peerDependencies": {
++        "react-hook-form": "^7.0.0"
++      }
++    },
+     "node_modules/@humanfs/core": {
+       "version": "0.19.1",
+       "resolved": "https://registry.npmjs.org/@humanfs/core/-/core-0.19.1.tgz",
+@@ -3107,6 +3120,11 @@
+       "integrity": "sha512-WJgX9nzTqknM393q1QJDJmoW28kUfEnybeTfVNcNAPnIx210RXm2DiXiHzfNPJNIUUb1tJnz/l4QGtJ30PgWmA==",
+       "dev": true
+     },
++    "node_modules/@standard-schema/utils": {
++      "version": "0.3.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/utils/-/utils-0.3.0.tgz",
++      "integrity": "sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g=="
++    },
+     "node_modules/@trysound/sax": {
+       "version": "0.2.0",
+       "resolved": "https://registry.npmjs.org/@trysound/sax/-/sax-0.2.0.tgz",
+@@ -3625,14 +3643,14 @@
+       "integrity": "sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g=="
+     },
+     "node_modules/@vitejs/plugin-react": {
+-      "version": "4.3.3",
+-      "resolved": "https://registry.npmjs.org/@vitejs/plugin-react/-/plugin-react-4.3.3.tgz",
+-      "integrity": "sha512-NooDe9GpHGqNns1i8XDERg0Vsg5SSYRhRxxyTGogUdkdNt47jal+fbuYi+Yfq6pzRCKXyoPcWisfxE6RIM3GKA==",
++      "version": "4.3.4",
++      "resolved": "https://registry.npmjs.org/@vitejs/plugin-react/-/plugin-react-4.3.4.tgz",
++      "integrity": "sha512-SCCPBJtYLdE8PX/7ZQAs1QAZ8Jqwih+0VBLum1EGqmCCQal+MIUqLCzj3ZUy8ufbC0cAM4LRlSTm7IQJwWT4ug==",
+       "dev": true,
+       "dependencies": {
+-        "@babel/core": "^7.25.2",
+-        "@babel/plugin-transform-react-jsx-self": "^7.24.7",
+-        "@babel/plugin-transform-react-jsx-source": "^7.24.7",
++        "@babel/core": "^7.26.0",
++        "@babel/plugin-transform-react-jsx-self": "^7.25.9",
++        "@babel/plugin-transform-react-jsx-source": "^7.25.9",
+         "@types/babel__core": "^7.20.5",
+         "react-refresh": "^0.14.2"
+       },
+@@ -3640,7 +3658,7 @@
+         "node": "^14.18.0 || >=16.0.0"
+       },
+       "peerDependencies": {
+-        "vite": "^4.2.0 || ^5.0.0"
++        "vite": "^4.2.0 || ^5.0.0 || ^6.0.0"
+       }
+     },
+     "node_modules/acorn": {
+@@ -11237,6 +11255,11 @@
+         "react-is": "^16.13.1"
+       }
+     },
++    "node_modules/property-expr": {
++      "version": "2.0.6",
++      "resolved": "https://registry.npmjs.org/property-expr/-/property-expr-2.0.6.tgz",
++      "integrity": "sha512-SVtmxhRE/CGkn3eZY1T6pC8Nln6Fr/lu1mKSgRud0eC73whjGfoAogbn78LkD8aFL0zz3bAFerKSnOl7NlErBA=="
++    },
+     "node_modules/property-information": {
+       "version": "6.5.0",
+       "resolved": "https://registry.npmjs.org/property-information/-/property-information-6.5.0.tgz",
+@@ -13319,6 +13342,11 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/tiny-case": {
++      "version": "1.0.3",
++      "resolved": "https://registry.npmjs.org/tiny-case/-/tiny-case-1.0.3.tgz",
++      "integrity": "sha512-Eet/eeMhkO6TX8mnUteS9zgPbUMQa4I6Kkp5ORiBD5476/m+PIRiumP5tmh5ioJpH7k51Kehawy2UDfsnxxY8Q=="
++    },
+     "node_modules/to-buffer": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/to-buffer/-/to-buffer-1.1.1.tgz",
+@@ -13340,6 +13368,11 @@
+       "resolved": "https://registry.npmjs.org/toggle-selection/-/toggle-selection-1.0.6.tgz",
+       "integrity": "sha512-BiZS+C1OS8g/q2RRbJmy59xpyghNBqrr6k5L/uKBGRsTfxmu3ffiRnd8mlGPUVayg8pvfi5urfnu8TU7DVOkLQ=="
+     },
++    "node_modules/toposort": {
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/toposort/-/toposort-2.0.2.tgz",
++      "integrity": "sha512-0a5EOkAUp8D4moMi2W8ZF8jcga7BgZd91O/yabJCFY8az+XSzeGyTKs0Aoo897iV1Nj6guFq8orWDS96z91oGg=="
++    },
+     "node_modules/trim-lines": {
+       "version": "3.0.1",
+       "resolved": "https://registry.npmjs.org/trim-lines/-/trim-lines-3.0.1.tgz",
+@@ -13459,6 +13492,17 @@
+         "node": ">= 0.8.0"
+       }
+     },
++    "node_modules/type-fest": {
++      "version": "2.19.0",
++      "resolved": "https://registry.npmjs.org/type-fest/-/type-fest-2.19.0.tgz",
++      "integrity": "sha512-RAH822pAdBgcNMAfWnCBU3CFZcfZ/i1eZjwFU/dsLKumyuuP3niueg2UAukXYF0E2AAoc82ZSSf9J0WQBinzHA==",
++      "engines": {
++        "node": ">=12.20"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/typed-array-buffer": {
+       "version": "1.0.2",
+       "resolved": "https://registry.npmjs.org/typed-array-buffer/-/typed-array-buffer-1.0.2.tgz",
+@@ -14219,6 +14263,17 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/yup": {
++      "version": "1.6.1",
++      "resolved": "https://registry.npmjs.org/yup/-/yup-1.6.1.tgz",
++      "integrity": "sha512-JED8pB50qbA4FOkDol0bYF/p60qSEDQqBD0/qeIrUCG1KbPBIQ776fCUNb9ldbPcSTxA69g/47XTo4TqWiuXOA==",
++      "dependencies": {
++        "property-expr": "^2.0.5",
++        "tiny-case": "^1.0.3",
++        "toposort": "^2.0.2",
++        "type-fest": "^2.19.0"
++      }
++    },
+     "node_modules/zwitch": {
+       "version": "2.0.4",
+       "resolved": "https://registry.npmjs.org/zwitch/-/zwitch-2.0.4.tgz",

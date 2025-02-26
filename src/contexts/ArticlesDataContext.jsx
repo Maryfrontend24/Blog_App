@@ -45,10 +45,18 @@ const articleReducer = (state, action) => {
     case "UPDATE_FAVORITED_ARTICLE":
       return {
         ...state,
-        articles: state.articles.map((article) =>
-          article.slug === action.payload.slug ? action.payload : article,
+        articles: state.articles.map((a) =>
+          a.slug === action.payload.slug
+            ? { ...a, ...action.payload } // Создаем новый объект для статьи
+            : a,
         ),
+        singleArticle:
+          state.singleArticle &&
+          state.singleArticle.slug === action.payload.slug
+            ? { ...state.singleArticle, ...action.payload } // Обновляем одну статью для singleArticle
+            : state.singleArticle,
       };
+
     case "PENDING":
       return {
         ...state,
@@ -72,18 +80,20 @@ const articleReducer = (state, action) => {
     case "LIKE_ARTICLE":
       return {
         ...state,
-        articles: state.articles.map((article) =>
-          article.slug === action.payload.slug
+        articles: state.articles.map((a) =>
+          a.slug === action.payload.slug
             ? {
-                ...article,
-                favorited: !article.favorited,
-                favoritesCount: article.favorited
-                  ? article.favoritesCount - 1
-                  : article.favoritesCount + 1,
+                // Не мутируем объект, а создаем новый
+                ...a,
+                favorited: !a.favorited,
+                favoritesCount: a.favorited
+                  ? a.favoritesCount - 1
+                  : a.favoritesCount + 1,
               }
-            : article,
+            : a,
         ),
       };
+
     case "DELETE_ARTICLE":
       return {
         ...state,
@@ -103,42 +113,6 @@ export const ArticlesProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const limit = 10;
-
-  // const getArticleList = async () => {
-  //   dispatch({ type: "SET_LOADING_ARTICLES", payload: true });
-  //   const url = `${BASE_URL}/articles`;
-  //   const offset = (currentPage - 1) * limit;
-  //
-  //   try {
-  //     const res = await axios.get(url, {
-  //       params: {
-  //         limit: limit,
-  //         offset: offset,
-  //       },
-  //     });
-  //
-  //     if (res.data.articles) {
-  //       dispatch({ type: "SET_ARTICLES", payload: res.data.articles });
-  //       dispatch({
-  //         type: "SET_ARTICLES_COUNT",
-  //         payload: res.data.articlesCount,
-  //       });
-  //     } else {
-  //       console.error("Articles not found :(");
-  //     }
-  //   } catch (error) {
-  //     dispatch({
-  //       type: "ERROR",
-  //       payload: error.message || "Произошла ошибка при получении статей",
-  //     });
-  //   } finally {
-  //     dispatch({ type: "SET_LOADING_ARTICLES", payload: false });
-  //   }
-  // };
-  //
-  // useEffect(() => {
-  //   getArticleList();
-  // }, [currentPage]);
 
   const getArticleList = async () => {
     dispatch({ type: "SET_LOADING_ARTICLES", payload: true });
@@ -264,12 +238,11 @@ export const ArticlesProvider = ({ children }) => {
           Authorization: `Token ${token}`,
         },
       });
-
       // Если код ответа 200 или 204,то удаление прошло успешно
       if (response.status === 200 || response.status === 204) {
         dispatch({ type: "DELETE_ARTICLE", payload: slug });
 
-        // Переадресовываем
+        // Переадресовывм
         navigate("/articles");
       } else {
         dispatch({
@@ -286,24 +259,22 @@ export const ArticlesProvider = ({ children }) => {
     }
   };
 
-  // Like
-  const favoriteArticle = async (slug, token) => {
+  const favoriteArticle = async (slug, token, isFavorited) => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/articles/${slug}/favorite`, // Используем BASE_URL
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
+      const method = isFavorited ? "DELETE" : "POST";
+      const response = await axios({
+        method,
+        url: `${BASE_URL}/articles/${slug}/favorite`,
+        headers: {
+          Authorization: `Token ${token}`,
+          "Content-Type": "application/json",
         },
-      );
-
-      // Обновляем статью в состоянии
-      dispatch({
-        type: "UPDATE_FAVORITED_ARTICLE",
-        payload: response.data.article,
+        data: {},
       });
+
+      return response.data.article; // Обновленная статья
     } catch (error) {
-      console.error("Error favoriting article:", error);
+      console.error("Error toggling favorite:", error.response?.data || error);
       throw error;
     }
   };

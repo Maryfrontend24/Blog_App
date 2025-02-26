@@ -5,7 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="41d83e05-b9f7-4290-a463-0fb619815c8b" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_17_02_2025,_18_24_[Changes]/shelved.patch" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_17_02_2025__18_24__Changes_.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/FormsModalAuth/UniversalForm.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/FormsModalAuth/UniversalForm.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/articleItem/ArticleItem.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/articleItem/ArticleItem.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/contexts/ArticlesDataContext.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/contexts/ArticlesDataContext.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/contexts/UsersContext.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/contexts/UsersContext.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/pages/SignInPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/pages/SignInPage.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/pages/SignUpPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/pages/SignUpPage.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -13,6 +25,11 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="pravki-blog" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
@@ -38,6 +55,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Node.js.ArticleItem.jsx.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "git-widget-placeholder": "pravki-blog",
     "last_opened_file_path": "/Users/mariapanova/WebstormProjects/Blog_App",
@@ -53,7 +71,7 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
-  <component name="RunManager" selected="npm.dev">
+  <component name="RunManager" selected="npm.prettier:fix">
     <configuration name="dev" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
       <package-json value="$PROJECT_DIR$/package.json" />
       <command value="run" />
@@ -86,9 +104,9 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="npm.prettier:fix" />
         <item itemvalue="npm.dev" />
         <item itemvalue="npm.lint:fix" />
-        <item itemvalue="npm.prettier:fix" />
       </list>
     </recent_temporary>
   </component>
@@ -111,6 +129,8 @@
       <workItem from="1739794978354" duration="6691000" />
       <workItem from="1739803495043" duration="8461000" />
       <workItem from="1740042717419" duration="17817000" />
+      <workItem from="1740501036724" duration="64000" />
+      <workItem from="1740501305023" duration="12991000" />
     </task>
     <servers />
   </component>

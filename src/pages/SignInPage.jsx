@@ -2,12 +2,14 @@ import React, { useState } from "react";
 import { useUsers } from "../contexts/UsersContext.jsx";
 // eslint-disable-next-line no-unused-vars
 import { UniversalForm } from "../components/FormsModalAuth/UniversalForm.jsx";
-import { useNavigate } from "react-router-dom"; // Импортируем useNavigate
+import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form"; // Импортируем useNavigate
 
 const SignInPage = () => {
   const { fetchLoginUser, errorUser } = useUsers();
   const [isError, setIsError] = useState(false);
   const navigate = useNavigate();
+  const { setError } = useForm();
 
   const handleFormSubmit = async (user) => {
     try {
@@ -31,7 +33,11 @@ const SignInPage = () => {
           <p>{errorUser || "Произошла ошибка при входе."}</p>
         </div>
       ) : (
-        <UniversalForm handleFormSubmit={handleFormSubmit} formType="signIn" />
+        <UniversalForm
+          formType="signIn"
+          handleFormSubmit={handleFormSubmit}
+          setError={setError}
+        />
       )}
     </div>
   );

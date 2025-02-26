@@ -46,14 +46,14 @@ const userReducer = (state, action) => {
         ...state,
         errorUser: action.payload,
         userStatusRequest: "rejected",
-        serverError: action.payload === "500" ? "500" : null,
+        serverErrors: action.payload, // Добавляем ошибку в сост.
       };
     case "SET_LAST_FAILED_ATTEMPT":
       return {
         ...state,
-        lastFailedAttempt: action.payload, // Обновляем данные о последней неудачной попытке
+        lastFailedAttempt: action.payload, // Обновляем данные о неудачной попытке
         errorUser: action.payload.email
-          ? state.errorUser || "Incorrect email or password. Try again." // Не сбрасываем ошибку
+          ? state.errorUser || "Incorrect email or password. Try again."
           : state.errorUser,
       };
 
@@ -95,18 +95,80 @@ export const UsersProvider = ({ children }) => {
     }
   }, []);
 
-  const registerUser = async (username, email, password) => {
+  const registerUser = async (username, email, password, setError) => {
+    if (
+      state.lastFailedAttempt.email === email &&
+      state.lastFailedAttempt.password === password
+    ) {
+      dispatch({
+        type: "ERROR",
+        payload: "This email has already been used. Try again.",
+      });
+      return; //  и не отправляем повторный запрос
+    }
+
+    if (
+      state.lastFailedAttempt.email !== email ||
+      state.lastFailedAttempt.password !== password
+    ) {
+      dispatch({
+        type: "SET_LAST_FAILED_ATTEMPT",
+        payload: { email: null, password: null },
+      });
+    }
+
     dispatch({ type: "SET_LOADING" });
 
+    const timeout = setTimeout(() => {
+      dispatch({
+        type: "ERROR",
+        payload: "Request timeout. Please try again.",
+      });
+      dispatch({ type: "STOP_LOADING" });
+    }, 5000);
+
     try {
-      const response = await axios.post(`${BASE_URL}/users`, {
-        user: { username, email, password },
+      const response = await axios.post(
+        `${BASE_URL}/users`,
+        {
+          user: { username, email, password },
+        },
+        { headers: { "Content-Type": "application/json" } },
+      );
+
+      const { user } = response.data;
+
+      if (!user?.token) {
+        throw new Error("Token not received or invalid");
+      }
+
+      clearTimeout(timeout);
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          username: user.username,
+          email: user.email,
+          bio: user.bio,
+          image: user.image,
+          token: user.token,
+        }),
+      );
+      localStorage.setItem("token", user.token);
+
+      axios.defaults.headers.common["Authorization"] = `Token ${user.token}`;
+
+      dispatch({ type: "SET_USER", payload: user });
+
+      // Сбрасываем данные о неудачной попытке
+      dispatch({
+        type: "SET_LAST_FAILED_ATTEMPT",
+        payload: { email: null, password: null },
       });
 
-      console.log("User registered successfully:", response.data);
-      navigate("/signin");
+      return user;
     } catch (error) {
-      console.error("Error during registration:", error);
+      clearTimeout(timeout);
 
       const errorMessage =
         error.response && error.response.data.errors
@@ -115,16 +177,44 @@ export const UsersProvider = ({ children }) => {
             ? `Error ${error.response.status}: ${error.response.statusText}`
             : error.message || "Network error";
 
-      if (error.response && error.response.status === 500) {
+      if (error.response?.status === 500) {
         dispatch({
           type: "ERROR",
-          payload: "500",
+          payload: "Internal Server Error. Please try again later.",
         });
+        alert("Произошла ошибка на сервере. Перенаправляем на главную.");
+        setTimeout(() => navigate("/"), 3000);
       } else {
+        dispatch({ type: "ERROR", payload: errorMessage });
+
+        // Сохраняем данные неудачн регистрации
         dispatch({
-          type: "ERROR",
-          payload: errorMessage,
+          type: "SET_LAST_FAILED_ATTEMPT",
+          payload: { email, password },
         });
+
+        //  сервер вернул ошибки, передаем их в setError
+        if (error.response?.data?.errors) {
+          const errorsFromServer = error.response.data.errors;
+          if (errorsFromServer.username) {
+            setError("username", {
+              type: "server",
+              message: "Username is already taken",
+            });
+          }
+          if (errorsFromServer.email) {
+            setError("email", {
+              type: "server",
+              message: "Email is already registered",
+            });
+          }
+          if (errorsFromServer.password) {
+            setError("password", {
+              type: "server",
+              message: errorsFromServer.password,
+            });
+          }
+        }
       }
     } finally {
       dispatch({ type: "STOP_LOADING" });
@@ -174,7 +264,7 @@ export const UsersProvider = ({ children }) => {
         payload: "Request timeout. Please try again.",
       });
       dispatch({ type: "STOP_LOADING" });
-    }, 10000);
+    }, 5000);
 
     try {
       const response = await axios.post(
@@ -308,7 +398,6 @@ export const UsersProvider = ({ children }) => {
 
   // выход
   const logoutUser = () => {
-    // Очищаем токен и данные из localStorage
     localStorage.removeItem("user");
     localStorage.removeItem("token");
 
